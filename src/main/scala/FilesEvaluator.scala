@@ -4,11 +4,17 @@ import Parser.{AssignmentStatement, ImportStatement}
 
 import scala.collection.mutable
 import scala.util.control.NonFatal
-import scala.util.parsing.input.{PagedSeq, PagedSeqReader, Position}
+import scala.util.parsing.input.{PagedSeq, PagedSeqReader}
+
+object FilesEvaluator {
+  case class Failure(message: String, stackTrace: List[(File, (Int, Int))])
+}
 
 class FilesEvaluator {
+  import FilesEvaluator.Failure
   type Vars = Map[String, String]
-  type Result = Either[(String, List[(File, (Int, Int))]), Vars]
+
+  type Result = Either[Failure, Vars]
   private val fileProgress: mutable.Map[File, Option[Vars]] = mutable.Map.empty
 
   def apply(file: File): Result = {
@@ -27,8 +33,8 @@ class FilesEvaluator {
                   case ImportStatement(fileName) =>
                     val importedFile = new File(canonicalFile.getParentFile, fileName + ".vars").getCanonicalFile
                     apply(importedFile) match {
-                      case Left((message, stackTrace)) =>
-                        return Left(message, (importedFile, (input.pos.line, input.pos.column)) :: stackTrace)
+                      case Left(Failure(message, stackTrace)) =>
+                        return Left(Failure(message, (importedFile, (input.pos.line, input.pos.column)) :: stackTrace))
                       case Right(importedMap) => privateVars ++= importedMap
                     }
                   case AssignmentStatement(key, value) =>
@@ -37,12 +43,12 @@ class FilesEvaluator {
                 fileProgress.put(canonicalFile, Some(vars))
                 input = next
               case Parser.NoSuccess(msg, next) =>
-                return Left((msg, List((canonicalFile, (next.pos.line, next.pos.column)))))
+                return Left(Failure(msg, List((canonicalFile, (next.pos.line, next.pos.column)))))
             }
           }
           Right(vars)
         }
-      case Some(None) => Left(("cyclic reference", List.empty))
+      case Some(None) => Left(Failure("cyclic reference", List.empty))
       case Some(Some(map)) => Right(map)
     }
   }
