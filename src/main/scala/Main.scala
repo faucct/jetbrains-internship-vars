@@ -20,8 +20,8 @@ class Main(out: PrintStream, err: PrintStream) {
           }
         case Left((message, stackTrace)) =>
           err.println(message ++ ":")
-          for ((file, position) <- stackTrace) {
-            err.println("  " ++ file.toString ++ ":" ++ position.line.toString)
+          for ((file, (line, _column)) <- stackTrace) {
+            err.println("  " ++ file.toString ++ ":" ++ line.toString)
           }
       }
     }
